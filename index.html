@@ -1,0 +1,261 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>技能材料見積もり</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f1f4f8;color:#17283c;font:16px system-ui,sans-serif}header{background:#15324c;color:white;padding:14px 18px}h1{font-size:20px;margin:0}main{max-width:1050px;margin:auto;padding:14px}section{background:white;border-radius:10px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px #0002}h2{font-size:18px;margin:0 0 12px}button,input,textarea,select{font:inherit}button{background:#edf4fb;border:1px solid #8ca4b9;border-radius:7px;padding:9px 12px;color:#173958;cursor:pointer}button.primary{background:#175b87;color:white}input,textarea,select{border:1px solid #aebdca;border-radius:5px;padding:7px;min-width:0}input[type=number]{width:90px}textarea{width:100%;min-height:65px}label{display:inline-flex;align-items:center;gap:8px;margin:4px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:5px}.grid label{display:flex;justify-content:space-between;background:#f4f7fa;padding:6px;border-radius:6px}.grid input{width:65px}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;border-bottom:1px solid #dce3e9;padding:7px;vertical-align:middle}th{background:#f1f5f9}.scroll{overflow-x:auto}small,.muted{color:#5e7080}.actions{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}.summary{font-size:19px;font-weight:bold;color:#164d73}details{margin:10px 0}summary{cursor:pointer;font-weight:600}.warn{color:#9d361b}.amount{white-space:nowrap} .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+body{background:#edf1f4}main{max-width:960px;padding:20px 14px}header{padding:20px max(18px,calc((100% - 932px)/2))}section{padding:22px;margin-bottom:18px;border:1px solid #dce4e9;box-shadow:none}h2{margin-bottom:16px}button{min-height:44px}button:disabled{opacity:.4;cursor:default}#remove{color:#a53030;background:#fff;border-color:#dbaaaa;margin-left:auto}#status{font-size:14px;background:#edf5f8;padding:10px;border-radius:6px}#newEstimate,#report{background:#175b87;color:white}#newEstimate{margin-bottom:14px}.actions{gap:10px}.row label{flex:1}.row input,.row select{width:100%}#fresh{margin-top:12px}#result input{width:100px}#money{background:#eaf4f8;padding:16px;border-radius:8px}
+@media(max-width:640px){section{padding:16px}.row{display:block}.row label{display:flex;margin:8px 0}.actions button{flex:1 1 140px}#remove{margin-left:0}.scroll:has(#result){overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:6px}.scroll:has(#result) table{min-width:760px}.scroll:has(#result) th,.scroll:has(#result) td{white-space:nowrap}.scroll:has(#result) th:first-child,.scroll:has(#result) td:first-child{position:sticky;left:0;z-index:1;background:#f1f5f9}.scroll:has(#result) td:first-child{font-weight:600}.summary{font-size:17px}}
+#choices{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}#choices label{justify-content:flex-start;gap:12px;padding:12px}#choices input{width:20px;height:20px;flex:none}#tsv{width:100%;font-weight:700}#spare{width:20px;height:20px}#result input{width:95px}section[hidden], [hidden]{display:none!important}
+.subNotice{margin:12px 0;padding:12px 14px;border:1px solid #efb4ae;border-left:4px solid #b3261e;border-radius:7px;background:#fff3f1;color:#a52620;font-weight:700;line-height:1.7}.subNotice strong{display:block;margin-bottom:4px}
+</style></head><body><header><h1>電工技能 材料見積もり</h1><small style="color:#d8e5ef">GitHub版 1.13 ／ APK <span id="apkver">スタンドアロン</span></small></header>
+<main>
+<section><h2>注文者と保存済み見積もり</h2><p id="status" class="summary"></p><button id="newEstimate">新規見積もり</button><div class="row"><label>あなたの名前 <input id="name" placeholder="あなたの名前"></label><label>保存済み <select id="saved"><option value="">選択してください</option></select></label></div><label style="display:block">メモ</label><textarea id="memo"></textarea><div class="actions"><button class="primary" id="save">保存</button><input id="estimateFile" type="file" accept=".tsv,text/tab-separated-values,text/plain" hidden><button id="remove">この見積もりを削除</button></div></section>
+<section><h2>材料を購入する候補問題</h2><div class="grid" id="choices"></div><label><input type="checkbox" id="spare"> リングスリーブの予備も購入する</label><button id="fresh">入力をクリア</button></section>
+<section><h2>見積もり結果</h2><p id="selected" class="muted"></p><p class="muted">材料ごとの補正で、購入する長さ・個数を調整できます。電線は0.05m単位、リングスリーブは1個単位で入力してください。</p><p id="priceRange" class="summary"></p><p class="muted">表示金額は調査単価に基づく概算です。実際の購入金額は全員分の集計後に確定します。</p><div class="scroll"><table><thead><tr><th>購入材料</th><th>合計</th><th>補正 ±</th><th>補正後</th><th>下限</th><th>上限</th></tr></thead><tbody id="result"></tbody></table></div><p class="warn" id="errors"></p><div id="subSection"><h3>代用する材料</h3><p class="subNotice"><strong>以下の材料は購入が難しいため、記載の代替材料で計算しています。</strong>不要な場合は、補正で減らしてください。</p><div id="sub"></div></div><div id="notPurchasedSection"><h3>購入しない材料</h3><div id="notPurchased"></div></div></section>
+<section><h2>保存・受け渡し</h2><p>注文者へ渡す</p><button id="report">見積もりをHTMLに保存</button><p>ファイル管理</p><div class="actions"><button id="tsv">見積もりをファイルに保存</button><button id="importEstimate">見積もりファイルを読み込む</button><button id="allTsv">集計をファイルに保存</button></div></section><section><details open><summary>候補問題ごとの材料明細（支給数）</summary><p class="muted">材料表の長さは1本当たりの約の寸法です。スリーブ支給数には予備を含みます。練習前に各自で元の材料表と照合してください。</p><div id="details"></div></details></section>
+<section><details><summary>単価設定</summary><p class="muted">初期値は提示されたカインズ壬生店・エイトプロの調査価格を基準に算出。100m巻を下限、1m単位を上限とし、スリーブは100個入りと小分けを使用。税・価格の変動は購入時に確認してください。</p><div class="scroll"><table><thead><tr><th>品目</th><th>単位</th><th>下限 円</th><th>上限 円</th></tr></thead><tbody id="prices"></tbody></table></div><p><label>目安の位置（下限0〜上限100%） <input id="ratio" type="number" min="0" max="100" step="1"> %</label></p><button id="resetPrices">初期価格に戻す</button></details></section>
+<section><details><summary>アプリ情報・HTML</summary><div class="muted">GitHub版 1.13<br>APK <span id="apkver2">スタンドアロン</span><br>使用中: <span id="filename">このHTML</span></div><div class="actions"><button id="importHtml">HTMLを取り込む</button><button id="exportHtml">現在のHTMLを書き出す</button><button id="useDefault">内蔵HTMLを有効にする</button></div><small>APK版の機能です。取り込んだHTMLはアプリ内に保存されます。</small></details></section>
+</main><script>
+const DATA=[[{"name": "EM-EEF 2.0mm・2芯", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 900, "count": 2}, {"name": "VVF 1.6mm・3芯", "mm": 350, "count": 1}, {"name": "リングスリーブ小", "count": 8, "spare": 3}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1250, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 800, "count": 1}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1650, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 350, "count": 1}, {"name": "IV 1.6mm・緑色", "mm": 150, "count": 1}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 450, "count": 1}, {"name": "VVF 2.0mm・3芯・シース青色", "mm": 550, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 850, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 500, "count": 1}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 350, "count": 1}, {"name": "VVF 2.0mm・3芯", "mm": 350, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1650, "count": 1}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 850, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 1050, "count": 1}, {"name": "リングスリーブ小", "count": 6, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1400, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 1150, "count": 1}, {"name": "リングスリーブ小", "count": 6, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVR 2.0mm・2芯", "mm": 300, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1100, "count": 2}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 600, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1250, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 350, "count": 1}, {"name": "IV 1.6mm・緑色", "mm": 150, "count": 1}, {"name": "リングスリーブ小", "count": 2, "spare": 1}, {"name": "リングスリーブ中", "count": 3, "spare": 1}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 300, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 650, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 450, "count": 1}, {"name": "リングスリーブ小", "count": 2, "spare": 1}, {"name": "リングスリーブ中", "count": 2, "spare": 1}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1200, "count": 1}, {"name": "IV 1.6mm・黒色", "mm": 550, "count": 1}, {"name": "IV 1.6mm・白色", "mm": 450, "count": 1}, {"name": "IV 1.6mm・赤色", "mm": 450, "count": 1}, {"name": "リングスリーブ小", "count": 2, "spare": 1}, {"name": "リングスリーブ中", "count": 2, "spare": 1}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1000, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 350, "count": 1}, {"name": "IV 1.6mm・黒色", "mm": 500, "count": 1}, {"name": "IV 1.6mm・白色", "mm": 400, "count": 1}, {"name": "IV 1.6mm・赤色", "mm": 400, "count": 1}, {"name": "リングスリーブ小", "count": 6, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}], [{"name": "VVF 2.0mm・2芯・シース青色", "mm": 250, "count": 1}, {"name": "VVF 1.6mm・2芯", "mm": 1400, "count": 1}, {"name": "VVF 1.6mm・3芯", "mm": 350, "count": 1}, {"name": "VVR 1.6mm・2芯", "mm": 250, "count": 1}, {"name": "IV 1.6mm・緑色", "mm": 150, "count": 1}, {"name": "リングスリーブ小", "count": 5, "spare": 2}, {"name": "リングスリーブ中", "count": 0, "spare": 0}]];
+const NAMES=['VVF 1.6mm・2芯','VVF 1.6mm・3芯','VVF 2.0mm・2芯','VVF 2.0mm・3芯','リングスリーブ小','リングスリーブ中'];
+const DEFAULT_PRICES=[[12870/100,330],[25800/100,600],[25500/100,570],[38800/100,830],[768/100,196/10],[1958/100,196/5]];
+let uiReady=false;const excluded=new Set();
+function ensureId(){if(!recordId)recordId='e-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);return recordId}
+const KEY='denkou-estimate-github-v1';
+let state={name:'',memo:'',estimateId:'',counts:Array(13).fill(0),spare:false,adjust:Array(6).fill(0),prices:DEFAULT_PRICES.map(x=>x.slice()),ratio:70};
+let records={}; let recordId=''; let selectedId='';
+const $=id=>document.getElementById(id), fmt=n=>Number(n.toFixed(3)).toString(), yen=n=>Math.round(n).toLocaleString('ja-JP')+'円', esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function persist(){} // Public edition: never save personal inputs to browser storage.
+function restore(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v){state={...state,...v.state};records=v.records||{};recordId=v.recordId||'';selectedId=recordId}}catch(e){}}
+function adjustmentError(value,i){
+ const n=Number(value),scale=i<4?20:1,steps=Math.round(n*scale);
+ return Number.isFinite(n)&&Number.isSafeInteger(steps)&&steps/scale===n?'':NAMES[i]+'：補正は'+(i<4?'0.05m':'1個')+'単位で入力してください。';
+}
+function readAdjustments(){
+ document.querySelectorAll('#result input[data-adjust]').forEach(el=>{state.adjust[Number(el.dataset.adjust)]=el.validity.badInput?NaN:Number(el.value)});
+}
+function calc(inputState=state){
+ const state=inputState;
+ const base=Array(6).fill(0), sub={em:0,vvr2:0,vvr16:0,iv:0,green:0}, errors=[];
+ DATA.forEach((rows,i)=>{let n=Number(state.counts[i])||0;if(!n)return;let iv=0;
+ rows.forEach(r=>{if(r.name.startsWith('リング')){let k=r.name.endsWith('小')?4:5;base[k]+=(r.count-(state.spare?0:r.spare))*n;return}
+ let m=r.mm*r.count*n/1000;
+ if(r.name.startsWith('IV')){if(r.name.includes('緑'))sub.green+=m;else iv=Math.max(iv,r.mm*r.count/1000);return}
+ let idx=r.name.includes('1.6mm・2芯')?0:r.name.includes('1.6mm・3芯')?1:r.name.includes('2.0mm・2芯')?2:3;
+ base[idx]+=m;
+ if(r.name.startsWith('EM-EEF'))sub.em+=m;
+ if(r.name.startsWith('VVR')){if(idx===0)sub.vvr16+=m;else sub.vvr2+=m}
+ });
+ base[1]+=iv*n;sub.iv+=iv*n;
+ });
+ let rows=base.map((v,i)=>{const unitError=adjustmentError(state.adjust[i],i);if(unitError)errors.push(unitError);let adj=Number(state.adjust[i])||0, q=v+adj,p=state.prices[i];if(q< -0.000001)errors.push(NAMES[i]+'：補正後の数量がマイナスです。');if(!p || !Number.isFinite(Number(p[0]))||!Number.isFinite(Number(p[1]))||Number(p[0])<0||Number(p[1])<0||Number(p[0])>Number(p[1]))errors.push(NAMES[i]+'：単価を確認してください。');q=Math.max(0,q);let lo=q*Number(p[0]),hi=q*Number(p[1]),mid=lo+(hi-lo)*Number(state.ratio)/100;return {v,adj,q,lo,hi,mid}});
+ if(state.ratio<0||state.ratio>100)errors.push('目安の割合は0〜100％にしてください。');
+ return {rows,sub,errors,total:rows.reduce((a,r)=>[a[0]+Math.round(r.lo),a[1]+Math.round(r.mid),a[2]+Math.round(r.hi)],[0,0,0])}
+}
+function renderChoices(){ $('choices').innerHTML=state.counts.map((v,i)=>'<label><input type="checkbox" data-count="'+i+'" '+(v?'checked':'')+'> No.'+(i+1)+'</label>').join('') }
+function renderPrices(){ $('prices').innerHTML=NAMES.map((name,i)=>'<tr><td>'+name+'</td><td>'+(i<4?'円/m':'円/個')+'</td>'+[0,1].map(j=>'<td><input type="number" min="0" step="0.01" data-price="'+i+','+j+'" value="'+state.prices[i][j]+'"></td>').join('')+'</tr>').join('');$('ratio').value=state.ratio}
+function render(){const c=calc();const saved=recordId&&records[recordId];$('status').textContent=saved?(JSON.stringify(saved)===JSON.stringify(state)?'保存済み：'+state.name:'編集中・未保存の変更あり：'+state.name):'新規・未保存';$('remove').disabled=!selectedId||!records[selectedId];$('name').value=state.name;$('memo').value=state.memo;$('spare').checked=state.spare;
+ $('priceRange').textContent='概算金額：'+yen(c.total[0])+' ～ '+yen(c.total[2]);
+ $('selected').textContent='選択した候補問題：'+(state.counts.map((x,i)=>x?'No.'+(i+1):'').filter(Boolean).join('、')||'未選択');
+ 
+ $('errors').textContent=c.errors.join(' ');
+ $('result').innerHTML=c.rows.map((r,i)=>'<tr><td data-label="材料">'+NAMES[i]+(i<4?'（灰色）':'')+'</td><td data-label="計算数量" class="amount">'+fmt(r.v)+(i<4?' m':' 個')+'</td><td data-label="補正 ±"><input type="number" min="'+fmt(-r.v)+'" step="'+(i<4?'0.05':'1')+'" data-adjust="'+i+'" value="'+state.adjust[i]+'"></td><td class="amount">'+fmt(r.q)+(i<4?' m':' 個')+'</td><td data-label="下限">'+yen(r.lo)+'</td><td data-label="上限">'+yen(r.hi)+'</td></tr>').join('');
+ const x=c.sub;
+ const substitutes=[['EM-EEF → VVF 2.0mm・2芯',x.em],['VVR 2.0mm・2芯 → VVF 2.0mm・2芯',x.vvr2],['VVR 1.6mm・2芯 → VVF 1.6mm・2芯',x.vvr16],['IV黒・白・赤 → VVF 1.6mm・3芯',x.iv]].filter(([,v])=>v>0);
+ $('subSection').hidden=substitutes.length===0;
+ $('sub').innerHTML=substitutes.map(([name,v])=>esc(name)+'：'+fmt(v)+' m').join('<br>');
+ $('notPurchasedSection').hidden=x.green<=0;
+ $('notPurchased').textContent=x.green>0?'IV線（緑）：必要量 '+fmt(x.green)+'m。共同購入では割安になりにくいため、端材の利用または各自での購入をお願いします。':'';
+ $('details').innerHTML=DATA.map((rs,i)=>{let n=state.counts[i];if(!n)return '';return '<h3>候補問題'+(i+1)+' × '+n+'回</h3><table><tr><th>元の材料</th><th>1回分</th><th>選択回数分</th></tr>'+rs.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+(r.mm?r.mm+'mm × '+r.count+'本':r.count+'個（予備 '+r.spare+'個）')+'</td><td>'+(r.mm?r.mm+'mm × '+r.count*n+'本':r.count*n+'個（予備 '+r.spare*n+'個）')+'</td></tr>').join('')+'</table>'}).join('')||'候補問題を選択してください。';
+ $('saved').innerHTML='<option value="">選択してください</option>'+Object.entries(records).map(([id,r])=>'<option value="'+esc(id)+'" '+(id===selectedId?'selected':'')+'>'+esc(r.name||'名前なし')+'</option>').join('');
+}
+function refresh(){render();persist();if(uiReady)renderOverview()}
+function tsv(download=true){const c=calc();if(c.errors.length){alert('数量や単価を確認してください');return}
+ const a=[['名前',state.name],['メモ',state.memo],['候補問題','回数']];
+ state.counts.forEach((n,i)=>a.push(['候補問題'+(i+1),String(n)+'回']));
+ a.push([],['見積もり結果'],['材料','単位','元の数量','補正','補正後数量','下限円','目安円','上限円','備考']);
+ c.rows.forEach((r,i)=>a.push([NAMES[i],i<4?'m':'個',fmt(r.v),fmt(r.adj),fmt(r.q),Math.round(r.lo),Math.round(r.mid),Math.round(r.hi),'']));
+ a.push(['合計','','','','',Math.round(c.total[0]),Math.round(c.total[1]),Math.round(c.total[2]),'単価による概算']);
+ a.push([],['特記事項'],['内容','数量','単位','備考']);
+ const x=c.sub;
+ [['EM-EEF → VVF 2.0mm・2芯',x.em],['VVR 2.0mm・2芯 → VVF 2.0mm・2芯',x.vvr2],['VVR 1.6mm・2芯 → VVF 1.6mm・2芯',x.vvr16],['IV黒・白・赤 → VVF 1.6mm・3芯',x.iv]].forEach(([k,v])=>a.push([k,fmt(v),'m','補正前']));
+ a.push(['IV緑は購入しない',fmt(x.green),'m','元の材料表に記載された数量']);
+ a.push([],['見積もり復元データ v1',JSON.stringify({...state,estimateId:ensureId()})]);
+ a.push(['リングスリーブの予備',state.spare?'含む':'含まない'],['金額','下限と上限は調査価格の単価による概算。巻数・余り・送料は含まない。'],[],['候補問題ごとの材料明細'],['候補問題','材料','1回あたり長さ','1回あたり本数・支給数','回数','予備数（1回分）']);
+ DATA.forEach((rs,i)=>{const n=state.counts[i];if(n)rs.forEach(r=>a.push(['候補問題'+(i+1),r.name,r.mm?r.mm+'mm':'',r.mm?r.count+'本':r.count+'個',n+'回',r.mm?'':r.spare+'個']))});
+ const text='\ufeff'+a.map(row=>Array.from({length:9},(_,i)=>String(row[i]??'').replace(/[\t\r\n]+/g,' ')).join('\t')).join('\r\n');
+ const filename=(state.name.trim()||'見積もり')+'.tsv';
+ if(download)exportTsvFile(filename,text);
+ return {filename,text};
+}
+function exportAll(){
+ const entries=Object.entries(records).filter(([id])=>!excluded.has(id)).map(([,r])=>r);
+ if(!entries.length){alert('保存済みの見積もりがありません。先に各人の見積もりを保存してください。');return}
+ const calculations=entries.map(r=>({record:r,result:calc(r)}));
+ const invalid=calculations.find(x=>x.result.errors.length);
+ if(invalid){alert((invalid.record.name||'名前なし')+'：'+invalid.result.errors.join(' '));return}
+ const a=[['全員分：保存済み見積もり'],['注記','各見積もりに保存した単価を使用。金額は材料別に1円単位で丸めてから合計。'],['注記','現在の入力は保存後に集計へ反映。個人TSVは別ボタンから出力。'],[],
+ ['個人別明細'],['名前','メモ','候補問題と回数','材料','単位','元の数量','補正','補正後数量','下限円','目安円','上限円','予備']];
+ const aggregate=NAMES.map(()=>({v:0,adj:0,q:0,lo:0,mid:0,hi:0}));
+ const cents=x=>Math.round(x)*100;
+ calculations.forEach(({record:r,result:c})=>{
+   const selected=r.counts.map((n,i)=>n?'No.'+(i+1)+'×'+n+'回':'').filter(Boolean).join('、');
+   c.rows.forEach((v,i)=>{
+     const lo=cents(v.lo),mid=cents(v.mid),hi=cents(v.hi), t=aggregate[i];
+     t.v+=v.v;t.adj+=v.adj;t.q+=v.q;t.lo+=lo;t.mid+=mid;t.hi+=hi;
+     a.push([r.name,r.memo,selected,NAMES[i],i<4?'m':'個',fmt(v.v),fmt(v.adj),fmt(v.q),(lo/100).toFixed(2),(mid/100).toFixed(2),(hi/100).toFixed(2),r.spare?'含む':'含まない']);
+   });
+   let sums=c.rows.reduce((z,v)=>[z[0]+cents(v.lo),z[1]+cents(v.mid),z[2]+cents(v.hi)],[0,0,0]);
+   a.push([r.name,'','', '個人合計','','','','',(sums[0]/100).toFixed(2),(sums[1]/100).toFixed(2),(sums[2]/100).toFixed(2),'']);
+ });
+ a.push([],['材料別合計'],['材料','単位','元の数量','補正','補正後数量','下限円','目安円','上限円']);
+ aggregate.forEach((t,i)=>a.push([NAMES[i],i<4?'m':'個',fmt(t.v),fmt(t.adj),fmt(t.q),(t.lo/100).toFixed(2),(t.mid/100).toFixed(2),(t.hi/100).toFixed(2)]));
+ const totals=aggregate.reduce((z,t)=>[z[0]+t.lo,z[1]+t.mid,z[2]+t.hi],[0,0,0]);
+ a.push(['全員合計','','','','',(totals[0]/100).toFixed(2),(totals[1]/100).toFixed(2),(totals[2]/100).toFixed(2)],[],['代用する材料・購入しない材料（補正前）'],['名前','EM-EEF → VVF 2.0mm 2芯 m','VVR → VVF 2.0mm 2芯 m','VVR → VVF 1.6mm 2芯 m','IV黒白赤 → VVF 1.6mm 3芯 m','IV緑 購入しない m']);
+ const subs={em:0,vvr2:0,vvr16:0,iv:0,green:0};
+ calculations.forEach(({record:r,result:c})=>{for(const k in subs)subs[k]+=c.sub[k];a.push([r.name,fmt(c.sub.em),fmt(c.sub.vvr2),fmt(c.sub.vvr16),fmt(c.sub.iv),fmt(c.sub.green)])});
+ a.push(['合計',fmt(subs.em),fmt(subs.vvr2),fmt(subs.vvr16),fmt(subs.iv),fmt(subs.green)]);
+ a.push([],['各人の候補問題ごとの材料明細'],['名前','候補問題','回数','元の材料','1回の長さ','1回の本数・支給数','予備（1回分）']);
+ calculations.forEach(({record:r})=>DATA.forEach((items,i)=>{const n=Number(r.counts[i])||0;if(n)items.forEach(item=>a.push([r.name,'候補問題'+(i+1),n+'回',item.name,item.mm?item.mm+'mm':'',item.mm?item.count+'本':item.count+'個',item.mm?'':item.spare+'個']))}));
+
+ const text='\ufeff'+a.map(row=>Array.from({length:12},(_,i)=>String(row[i]??'').replace(/[\t\r\n]+/g,' ')).join('\t')).join('\r\n');
+ exportTsvFile('集計.tsv',text);
+
+}
+function exportTsvFile(suggested,text){
+ suggested=suggested.replace(/[\/\\:*?"<>|\x00-\x1f]/g,'_');
+ if(window.EstimateBridge&&EstimateBridge.exportText){
+   if(EstimateBridge.version&&EstimateBridge.version()==='1.0.0'){alert('ファイル名を指定するにはAPK v1.0.1以降への更新が必要です。');return}
+   EstimateBridge.exportText(suggested,text);return;
+ }
+ const chosen=prompt('保存する注文票TSVファイル名を入力してください',suggested);
+ if(chosen===null)return;
+ let name=chosen.trim();
+ if(!name){alert('ファイル名を入力してください');return}
+ if(/[\/\\:*?"<>|\x00-\x1f]/.test(name)){alert('ファイル名に使えない文字があります');return}
+ if(!/\.tsv$/i.test(name))name+='.tsv';
+ let u=URL.createObjectURL(new Blob([text],{type:'text/tab-separated-values;charset=utf-8'}));
+ let link=document.createElement('a');link.href=u;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(u),60000)
+}
+function loadEstimateFile(text){
+ const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).map(x=>x.split('\t'));
+ const row=lines.find(x=>x[0]==='見積もり復元データ v1');
+ if(!row){alert('このファイルには復元データがありません。新しい版で保存した個人用見積もりファイルを選んでください。');return}
+ let next;
+ try{next=JSON.parse(row[1]);if(!next||typeof next.name!=='string'||typeof next.memo!=='string'||!Array.isArray(next.counts)||next.counts.length!==13||!Array.isArray(next.adjust)||next.adjust.length!==6||!Array.isArray(next.prices)||next.prices.length!==6||!next.prices.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))||!next.counts.every(n=>Number.isInteger(n)&&n>=0&&n<=100)||!next.adjust.every(Number.isFinite)||typeof next.spare!=='boolean'||!Number.isFinite(next.ratio))throw Error();}catch(e){alert('見積もりファイルの内容を読み取れません。');return}
+ if(!confirm('現在の入力をファイルの内容に置き換えますか？'))return;
+ state=next;recordId=typeof next.estimateId==='string'?next.estimateId:'';selectedId=records[recordId]?recordId:'';renderChoices();renderPrices();refresh();alert('見積もりを読み込みました。端末内に保存する場合は「保存」を押してください。');
+}
+$('importEstimate').onclick=()=>{if(window.EstimateBridge&&EstimateBridge.importEstimate){EstimateBridge.importEstimate();return}$('estimateFile').value='';$('estimateFile').click()};
+$('estimateFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>4*1024*1024)throw Error();loadEstimateFile(await f.text())}catch(err){alert('ファイルを読み取れません。')}};
+window.receiveEstimateFile=loadEstimateFile;
+$('newEstimate').onclick=()=>{if(!confirm('新しい見積もりを始めますか？ 現在の未保存の変更は失われます。'))return;state={...state,name:'',memo:'',estimateId:'',counts:Array(13).fill(0),spare:false,adjust:Array(6).fill(0)};recordId='';selectedId='';renderChoices();refresh()};
+$('report').onclick=()=>{
+ const c=calc();if(c.errors.length){alert('数量や単価を確認してください');return}
+ const x=c.sub;let selected=state.counts.map((n,i)=>n?'候補'+(i+1)+'：'+n+'回':'').filter(Boolean).join('、')||'未選択';
+ let rows=c.rows.map((r,i)=>'<tr><td>'+esc(NAMES[i])+'</td><td>'+fmt(r.v)+'</td><td>'+fmt(r.adj)+'</td><td>'+fmt(r.q)+' '+(i<4?'m':'個')+'</td><td data-label="下限">'+yen(r.lo)+'</td><td data-label="上限">'+yen(r.hi)+'</td></tr>').join('');
+ let details=DATA.map((rs,i)=>state.counts[i]?'<h3>候補'+(i+1)+' × '+state.counts[i]+'回</h3><ul>'+rs.map(r=>'<li>'+esc(r.name)+'：'+(r.mm?r.mm+'mm × '+r.count+'本':r.count+'個（予備 '+r.spare+'個）')+'</li>').join('')+'</ul>':'').join('');
+ let page='<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>お見積書</title><style>body{font:16px sans-serif;line-height:1.6;max-width:900px;margin:1em auto;padding:1em;color:#222}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border:1px solid #aaa;padding:6px;text-align:left}h2{border-bottom:2px solid #456} .scroll{overflow-x:auto}@media print{body{font-size:12px}}</style><h1>お見積書</h1><p>'+esc(state.name.replace(/様\s*$/,''))+' 様'+'</p><p>メモ：'+esc(state.memo).replace(/\n/g,'<br>')+'</p><p>選択問題：'+esc(selected)+'</p><p>リングスリーブの予備：'+(state.spare?'含む':'含まない')+'</p><h2>見積もり結果</h2><p class="muted">材料ごとの補正で、購入する長さ・個数を調整できます。電線は0.05m単位、リングスリーブは1個単位で入力してください。</p><p>'+yen(c.total[0])+' 〜 '+yen(c.total[2])+'（目安 '+yen(c.total[1])+'）</p><div class="scroll"><table><tr><th>材料</th><th>元数量</th><th>補正</th><th>補正後</th><th>下限</th><th>目安</th><th>上限</th></tr>'+rows+'</table></div><p>金額は全員分の注文を集計後に確定します。目安額は、確定時の値上がりをなるべく避けるため、見積範囲の中間よりやや高めに設定しています。まとめて購入することで、目安額より安くなる見込みです。</p><h2>代用する材料</h2><p>EM-EEF → VVF 2.0mm 2芯：'+fmt(x.em)+'m<br>VVR 2.0mm 2芯 → VVF 2.0mm 2芯：'+fmt(x.vvr2)+'m<br>VVR 1.6mm 2芯 → VVF 1.6mm 2芯：'+fmt(x.vvr16)+'m<br>IV黒白赤 → VVF 1.6mm 3芯：'+fmt(x.iv)+'m</p><h2>購入しない材料</h2><p>IV緑：'+fmt(x.green)+'m</p><h2>候補問題ごとの材料明細（1回分）</h2>'+details+'</html>';
+ let name=(state.name.trim()||'見積もり')+'_見積もり.html';if(window.EstimateBridge&&EstimateBridge.exportReport){EstimateBridge.exportReport(name,page);return}let chosen=prompt('保存するHTMLファイル名',name);if(!chosen)return;if(!/\.html$/i.test(chosen))chosen+='.html';let u=URL.createObjectURL(new Blob([page],{type:'text/html;charset=utf-8'}));let a=document.createElement('a');a.href=u;a.download=chosen;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000)
+};
+$('allTsv').onclick=exportAll;
+renderChoices();renderPrices();render();
+document.addEventListener('change',e=>{if(e.target.dataset.count!==undefined){state.counts[+e.target.dataset.count]=e.target.checked?1:0;refresh()}else if(e.target.dataset.adjust!==undefined){state.adjust[+e.target.dataset.adjust]=+e.target.value||0;refresh()}});
+document.addEventListener('input',e=>{let t=e.target;if(t.id==='name')state.name=t.value;else if(t.id==='memo')state.memo=t.value;else if(t.id==='ratio')state.ratio=t.value===''?-1:Number(t.value);else if(t.dataset.count!==undefined)return;else if(t.dataset.adjust!==undefined)return;else if(t.dataset.price){let [i,j]=t.dataset.price.split(',').map(Number);state.prices[i][j]=t.value===''?-1:Number(t.value)}else return;refresh()});
+$('spare').onchange=e=>{state.spare=e.target.checked;refresh()};
+$('saved').onchange=e=>{
+ const next=e.target.value;if(!next||!records[next])return;
+ const original=records[recordId],dirty=original?JSON.stringify(original)!==JSON.stringify(state):(state.name||state.memo||state.counts.some(Number)||state.adjust.some(Number));
+ if(dirty&&!confirm('未保存の入力は読み込みで置き換わります。続けますか？')){render();return}
+ selectedId=recordId=next;state=JSON.parse(JSON.stringify(records[next]));renderChoices();renderPrices();refresh();
+};
+$('save').onclick=()=>{if(!state.name.trim()){alert('名前を入力してください');return}if(!recordId){do{recordId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)}while(records[recordId]);}state.estimateId=recordId;records[recordId]=JSON.parse(JSON.stringify(state));selectedId=recordId;refresh()};
+$('fresh').onclick=()=>{if(!confirm('候補問題・補正値・リングスリーブの予備設定をクリアしますか？'))return;state={...state,counts:Array(13).fill(0),spare:false,adjust:Array(6).fill(0)};renderChoices();refresh()};
+$('remove').onclick=()=>{if(!selectedId||!records[selectedId])return alert('削除する見積もりを選択してください');if(confirm('選択した保存済みの見積もりを削除しますか？')){delete records[selectedId];recordId='';selectedId='';state={...state,name:'',memo:'',estimateId:'',counts:Array(13).fill(0),spare:false,adjust:Array(6).fill(0)};renderChoices();refresh()}};
+$('resetPrices').onclick=()=>{if(confirm('単価を初期値に戻しますか？')){state.prices=DEFAULT_PRICES.map(x=>x.slice());state.ratio=70;renderPrices();refresh()}};
+$('tsv').onclick=()=>{if(!state.name.trim()){alert('名前を入力してください');return}if(!state.counts.some(Boolean)){alert('候補問題を1つ以上選択してください');return}tsv()};
+if(window.EstimateBridge){$('apkver').textContent=$('apkver2').textContent=EstimateBridge.version();$('filename').textContent=EstimateBridge.htmlName();$('importHtml').onclick=()=>EstimateBridge.importHtml();$('exportHtml').onclick=()=>EstimateBridge.exportHtml();if(EstimateBridge.useDefault)$('useDefault').onclick=()=>EstimateBridge.useDefault();else $('useDefault').hidden=true}else{$('importHtml').hidden=true;$('exportHtml').hidden=true;$('useDefault').hidden=true}
+
+// GitHub Pages participant edition: single editor page.
+$('status').hidden=true;
+$('newEstimate').hidden=true;
+$('saved').parentElement.hidden=true;
+$('save').hidden=true;
+$('remove').hidden=true;
+$('fresh').hidden=true;
+$('importEstimate').hidden=true;
+$('report').hidden=true;
+$('allTsv').hidden=true;
+$('estimateFile').hidden=true;
+const sections=[...document.querySelectorAll('main > section')];
+const exportButton=$('tsv'); // Keep reference before removing its original section.
+sections[3].remove(); // old export/import area
+sections[5].remove(); // price settings
+sections[6].remove(); // APK settings
+const spare=$('spare').closest('label');
+$('spare').checked=state.spare;
+sections[2].insertBefore(spare,sections[2].querySelector('.scroll'));
+refresh();
+
+const out=document.createElement('section');
+out.innerHTML='<h2>見積もり保存</h2><p>注文票TSVファイルと閲覧用HTMLを保存します。注文票TSVファイルを共同購入の担当者に渡してください。</p>';
+out.append(exportButton);
+exportButton.textContent='見積もり保存';
+exportButton.classList.add('primary');
+sections[2].after(out);
+$('name').placeholder='あなたの名前';
+sections[0].querySelector('h2').textContent='名前・メモ';
+sections[1].querySelector('h2').textContent='材料を購入する候補問題';
+
+const note=document.createElement('p');note.className='muted';
+note.textContent='数量は希望数量の目安です。全員分をまとめて購入するため、販売単位や端数調整によって実際の配布数量・最終金額が異なる場合があります。必要に応じて少し多めに購入・配布します。';
+sections[2].append(note);
+
+// Export a read-only HTML snapshot and a compatible TSV without retaining browser state.
+function downloadFile(filename,contents,type){
+ const safe=filename.replace(/[\/\\:*?"<>|\x00-\x1f]/g,'_');
+ const url=URL.createObjectURL(new Blob([contents],{type}));
+ const a=document.createElement('a');a.href=url;a.download=safe;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function snapshotHtml(){
+ // Capture the currently calculated result as a self-contained read-only document.
+ // Never remove the results section merely because it contains the export button.
+ const sourceSections=[sections[0],sections[1],sections[2],sections[4]];
+ const main=document.createElement('main');
+ sourceSections.forEach(sec=>main.appendChild(sec.cloneNode(true)));
+ main.querySelectorAll('[hidden]').forEach(el=>el.remove());
+ main.querySelectorAll('button').forEach(el=>el.remove());
+ main.querySelectorAll('input').forEach(el=>{
+   const span=document.createElement('span');
+   if(el.type==='checkbox')span.textContent=el.checked?'☑':'☐';
+   else span.textContent=el.value||'（未入力）';
+   el.replaceWith(span);
+ });
+ main.querySelectorAll('textarea').forEach(el=>{
+   const span=document.createElement('span');span.textContent=el.value||'（なし）';span.style.whiteSpace='pre-wrap';el.replaceWith(span);
+ });
+ main.querySelectorAll('select').forEach(el=>el.remove());
+ // The source list is a form; in the saved view show only selected problems.
+ const choices=main.querySelector('#choices');
+ if(choices){choices.innerHTML=state.counts.map((n,i)=>n?'<span class="chosen">No.'+(i+1)+'</span>':'').join('')||'未選択';}
+ const adjustments=main.querySelectorAll('#result tr');
+ adjustments.forEach((tr,i)=>{const cells=tr.querySelectorAll('td');if(cells.length>2)cells[2].textContent=fmt(Number(state.adjust[i])||0)+(i<4?' m':' 個');});
+ const spareLabel=main.querySelector('#spare');
+ if(spareLabel)spareLabel.parentElement.textContent='リングスリーブの予備も購入する：'+(state.spare?'はい':'いいえ');
+ const details=main.querySelector('details');if(details)details.open=true;
+ const styles=[...document.querySelectorAll('head style')].map(el=>el.textContent).join('\n');
+ return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>材料購入希望内容 - '+esc(state.name)+'</title><style>'+styles+'\nbody{max-width:1100px;margin:auto}main{display:block}.chosen{display:inline-block;padding:8px 12px;margin:4px;background:#edf4fb;border-radius:6px}</style></head><body><header><h1>電工技能 材料見積もり（保存内容）</h1></header>'+main.outerHTML+'</body></html>';
+}
+exportButton.onclick=()=>{
+ if(!state.name.trim()){alert('あなたの名前を入力してください');return}
+ if(!state.counts.some(Boolean)){alert('候補問題を1つ以上選択してください');return}
+ readAdjustments();refresh();
+ const c=calc();if(c.errors.length){alert('数量や単価を確認してください');return}
+ const t=tsv(false);if(!t)return;
+ const filename=(state.name.trim()||'見積もり');
+ downloadFile(filename+'_注文票.tsv',t.text,'text/tab-separated-values;charset=utf-8');
+ downloadFile(filename+'_閲覧用.html',snapshotHtml(),'text/html;charset=utf-8');
+};
+
+uiReady=false;
+</script></body></html>
